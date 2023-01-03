@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowChart</title>
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/font-awesome.min.css">
+</head>
+
+<body>
+    <div id="search">
+        <input id="input" placeholder="Search..." />
+        <button id="button"><i class="fa fa-search"></i></button>
+        <div class="spinner"><i class="fa fa-spinner"></i></div>
+    </div>
+    <div class="note">Click the button or hit enter.</div>
+
+    <script>
+        var search = document.getElementById('search');
+        var button = document.getElementById('button');
+        var input = document.getElementById('input');
+        function open_page() {
+            if (input.value.trim())
+                window.location.href = input.value;
+        }
+        input.addEventListener('keydown', function () {
+            if (event.keyCode == 13) open_page();
+        });
+        button.addEventListener('click', open_page);
+
+    </script>
+</body>
+
+</html>
