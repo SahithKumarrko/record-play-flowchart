@@ -17,12 +17,14 @@
         <div class="spinner"><i class="fa fa-spinner"></i></div>
     </div>
     <div class="note">Click the button or hit enter.</div>
-
+    <a href="http://www.google.com" target="_blank">Open new page</a>
+    <a href="http://www.google.com" target="_self">Open self page</a>
     <script>
         var search = document.getElementById('search');
         var button = document.getElementById('button');
         var input = document.getElementById('input');
         function open_page() {
+            alert("D osdasd");
             if (input.value.trim())
                 window.location.href = input.value;
         }

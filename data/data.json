@@ -1,0 +1,25 @@
+{
+    "url": "",
+    "state": "start",
+    "code": [
+        {
+            "action": {
+                "action": "visit",
+                "value": "file:///G:/flowchart-app/app/index.html"
+            },
+            "details": {}
+        },
+        {
+            "action": {
+                "action": "click"
+            },
+            "details": {
+                "type": "role",
+                "value": "link",
+                "options": {
+                    "name": "Open self page"
+                }
+            }
+        }
+    ]
+}

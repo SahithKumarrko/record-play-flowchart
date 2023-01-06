@@ -1,114 +1,63 @@
 var { ipcRenderer } = require('electron');
 
-var control_css = `.action-btn{transition: all .25s ease-in-out;font-size: 1.5rem !important;cursor: pointer;}.action-btn:hover{transform:scale(1.15) !important;}#pause,#stop{pointer-events:none}#__flowchartCreator_app_controls__.open,#__flowchartCreator_app_controls__:hover{background:#ffff;box-shadow:rgb(50 50 93 / 25%) 0 13px 27px -5px,rgb(0 0 0 / 30%) 0 8px 16px -8px}.action-btn{transition:.15s ease-in-out;font-size:1.5rem!important;cursor:pointer}#start{color:#28a745}#stop{color:#f8bec5}#pause{color:#bddbfa}#__flowchartCreator_app_controls__{color:rgba(0,0,0,.2);background:rgba(255,255,255,.3);font-weight:100;width:34px;height:34px;padding:0;border-radius:100%;overflow:hidden;display:inline-block;cursor:pointer;bottom:8px;right:8px;position:absolute;transition:.3s}#__flowchartCreator_app_controls__ .open-close{transition:.3s;position:absolute;bottom:6px;width:24px;height:24px;z-index:999999999999;right:3.5px;font-size:24px;color:rgba(255,255,255,.3)}#__flowchartCreator_app_controls__:hover,#__flowchartCreator_app_controls__:hover .open-close{color:#000}#__flowchartCreator_app_controls__.open .open-close{color:#000}#__flowchartCreator_app_controls_box__{color:#000;opacity:0;position:relative;display:flex;justify-content:space-around;align-items:center;height:100%;padding-right:8px;-webkit-transform:translateX(30px);transform:translateX(30px)}#__flowchartCreator_app_controls__.open{width:12rem;height:2.3rem;position:absolute;margin:0;cursor:inherit;z-index:99999999999999;border-radius:3px}#__flowchartCreator_app_controls__.open .open-close{color:#000;font-size:24px;opacity:.7;cursor:pointer;z-index:2}#__flowchartCreator_app_controls__.open .open-close:hover{opacity:1}#__flowchartCreator_app_controls__.open #__flowchartCreator_app_controls_box__{opacity:1!important;-webkit-transform:translateY(0)!important;transform:translateY(0)!important;-moz-transition:-moz-transform .5s .55s,opacity 1s .55s!important;-o-transition:-o-transform .3s .35s,opacity 1s .35s!important;transition:transform .3s .35s,opacity 1s .35s,-webkit-transform .3s .35s!important}`;
+const getElementSelector = require("./element_selector.js");
+
+const dom_accessibility_api = require("dom-accessibility-api");
+const ariaQuery = require("aria-query");
+// The current CY selector generated from the user action.
+var current_selector = { element: null, selector: null };
+// To handle tab presses. (If isTabPressed==1 and onchange event is fired then the code needs to be corrected by moving the code for onchange event on top of tab press code. As this is how events occur keydown->OnChange->Focus)
+var isKeyPressed = -1;
+// the Cy selector on which the TAB key is pressed.
+var key_pressed_selector_element = {};
+
+var keysPressed = [];
+
+const TAB_CODE = 9, ENTER_CODE = 13;
+
+var settings = { "selector_order": ["cy.findByRole", "cy.findByText", "cy.findByLabelText", "cy.findByPlaceholderText", "cy.findByTestId", "cy.get"], "trim": true, useAllElements: true };
+
+var control_css = `.action-btn{transition: all .25s ease-in-out;font-size: 1.5rem !important;cursor: pointer;}.action-btn:hover{transform:scale(1.15) !important;}#pause,#stop{pointer-events:none}#__flowchartCreator_app_controls__.open,#__flowchartCreator_app_controls__:hover{background:#ffff;box-shadow:rgb(50 50 93 / 25%) 0 13px 27px -5px,rgb(0 0 0 / 30%) 0 8px 16px -8px}.action-btn{transition:.15s ease-in-out;font-size:1.5rem!important;cursor:pointer}#start{color:#28a745}#stop{color:#f8bec5}#pause{color:#bddbfa}#__flowchartCreator_app_controls__{color:rgba(0,0,0,.2);background:transparent;box-shadow: rgba(0, 0, 0, 0.25) 0px 14px 28px, rgba(0, 0, 0, 0.22) 0px 10px 10px;border:1px solid rgba(0,0,0,0.3);font-weight:100;width:34px;height:34px;padding:0;border-radius:100%;overflow:hidden;display:inline-block;cursor:pointer;bottom:8px;right:8px;position:fixed;transition:.3s}#__flowchartCreator_app_controls__ .open-close{transition:.3s;position:absolute;bottom:4px;width:24px;height:24px;z-index:999999999999;right:2.8px;font-size:24px;color:rgba(0,0,0,.3)}#__flowchartCreator_app_controls__:hover,#__flowchartCreator_app_controls__:hover .open-close{color:#000}#__flowchartCreator_app_controls__.open .open-close{color:#000}#__flowchartCreator_app_controls_box__{color:#000;opacity:0;position:relative;display:flex;justify-content:space-around;align-items:center;height:100%;padding-right:8px;-webkit-transform:translateX(30px);transform:translateX(30px)}#__flowchartCreator_app_controls__.open{width:12rem;height:2.3rem;position:fixed;margin:0;cursor:inherit;z-index:99999999999999;border-radius:3px}#__flowchartCreator_app_controls__.open .open-close{color:#000;font-size:24px;opacity:.7;cursor:pointer;z-index:2}#__flowchartCreator_app_controls__.open .open-close:hover{opacity:1}#__flowchartCreator_app_controls__.open #__flowchartCreator_app_controls_box__{opacity:1!important;-webkit-transform:translateY(0)!important;transform:translateY(0)!important;-moz-transition:-moz-transform .5s .55s,opacity 1s .55s!important;-o-transition:-o-transform .3s .35s,opacity 1s .35s!important;transition:transform .3s .35s,opacity 1s .35s,-webkit-transform .3s .35s!important}`;
 var control_html = `<i id="__flowchartCreator_app_controls_toggle_btn__" class="fa fa-cog open-close" data-toggle="false"></i>
 <div id="__flowchartCreator_app_controls_box__" style="margin-right: 1rem;">
     <i id="start" title="Start Recording" class="fa fa-play action-btn"></i>
     <i id="pause" title="Pause the recording" class="fa fa-pause action-btn"></i>
     <i id="stop" title="Stop Recording" class="fa fa-stop action-btn"></i>
 </div>`;
-var data = { url: "", state: "stop" };
-
-ipcRenderer.on('on-parent-recv', function (event, data) {
-    ipcRenderer.send('data-from-child', { value: 'hello' });
-});
-ipcRenderer.send('data-from-child', { value: 'loaded' });
-var inspecting_element = {};
-var clicked = false;
-function get_height(element) {
-    var elementHeight, elementMargin, elementBorder;
-    elementHeight = parseFloat(document.defaultView.getComputedStyle(element, '').getPropertyValue('height').replaceAll(/px|rem|vh|vhmax|%/ig, ""));
-    var mb = parseInt(document.defaultView.getComputedStyle(element, '').getPropertyValue('margin-bottom'));
-    var mt = parseInt(document.defaultView.getComputedStyle(element, '').getPropertyValue('margin-top'))
-    elementMargin = ((isNaN(mt) || mt < 0) ? 0 : mt) + ((isNaN(mb) || mb < 0) ? 0 : mb);
-    var bb = parseInt(document.defaultView.getComputedStyle(element, '').getPropertyValue('border-bottom'));
-    var bt = parseInt(document.defaultView.getComputedStyle(element, '').getPropertyValue('border-top'))
-    elementBorder = ((isNaN(bt) || bt < 0) ? 0 : bt) + ((isNaN(bb) || bb < 0) ? 0 : bb);
-    return elementHeight + elementMargin + elementBorder;
-}
-
-function get_width(element) {
-    var elementWidth, elementMargin, elementBorder;
-    elementWidth = parseFloat(document.defaultView.getComputedStyle(element, '').getPropertyValue('width').replaceAll(/px|rem|vh|vhmax|%/ig, ""));
-    var ml = parseInt(document.defaultView.getComputedStyle(element, '').getPropertyValue('margin-left'));
-    var mr = parseInt(document.defaultView.getComputedStyle(element, '').getPropertyValue('margin-right'))
-    elementMargin = ((isNaN(mr) || mr < 0) ? 0 : mr) + ((isNaN(ml) || ml < 0) ? 0 : ml);
-    var bl = parseInt(document.defaultView.getComputedStyle(element, '').getPropertyValue('border-left'));
-    var br = parseInt(document.defaultView.getComputedStyle(element, '').getPropertyValue('border-right'))
-    elementBorder = ((isNaN(br) || br < 0) ? 0 : br) + ((isNaN(bl) || bl < 0) ? 0 : bl);
-    return elementWidth + elementMargin + elementBorder;
-}
-
-function _createMark(element, cy_selector) {
-    var rect = element.getBoundingClientRect();
-    var win = element.ownerDocument.defaultView;
-    var top = rect.top;
-    var left = rect.left + win.pageXOffset;
-    var right = rect.right;
-    var width = get_width(document.body);
-    var element_height = get_height(element);
-    top = top < 36 ? ((isNaN(element_height) ? 16 : element_height) + top + 5) : (rect.top - 28);
-
-    var e = document.getElementById("__cy_selector_extension__");
-    if (e != null)
-        e.remove();
-    var div_ele = document.createElement("div");
-    div_ele.id = "__cy_selector_extension__";
-    var colors = { "textColor": "white", "backgroundColor": "rgb(0,0,0)" };
-    div_ele.innerHTML += "<div id='__fbrowser_selection_mark_area_content__' style='pointer-events: none;margin:0;z-index:200000;padding: 4px 6px !important;border-radius:6px;color:" + colors["textColor"] + ";background-color:" + colors["backgroundColor"] + ";font-weight:bold;font-size:16px;position:fixed;top:" + top + "px;" + ((width - left < 200) ? `right:${width - right}px;` : `left:${left}px;`) + "'>" + cy_selector + "</div>";
-    document.body.append(div_ele);
-}
-
-function _clear() {
-    if ("current_element" in inspecting_element) {
-        var ele = inspecting_element["current_element"];
-        ele.style = inspecting_element["style"];
-        if (inspecting_element["inline-style"] && inspecting_element["inline-style"].trim())
-            ele.setAttribute("style", inspecting_element["inline-style"]);
-        else
-            ele.removeAttribute("style");
-    }
-    var e = document.getElementById("__cy_selector_extension__");
-    if (e != null)
-        e.remove();
-    clicked = false;
-}
-
-function handleMouseOver(e) {
-    if (!clicked) {
-        _clear();
-        e = e || window.event;
-        var element = e.target || e.srcElement;
-        var text = element.textContent || element.innerText;
-        var s = element.style;
-        inspecting_element["current_element"] = element;
-        inspecting_element["style"] = s;
-        inspecting_element["inline-style"] = element.getAttribute("style")
-        element.style.backgroundColor = "#0175c26b";
-        element.style.border = "2px solid orange";
-        var selector = "Element hovered";
-        _createMark(element, selector);
-    }
-}
-
-function handleClick(event) {
-    if (document.getElementById("__cy_selector_extension__")) {
-        // event.preventDefault();
-        // event.stopPropagation();
-        clicked = true;
-        var e = document.getElementById("__fbrowser_selection_mark_area_content__");
-        if (e) {
-            e.style.pointerEvents = "auto";
+var data = { url: "", state: "stop", code: [], windowId: -1 };
+var addedControls = false;
+ipcRenderer.on('response', function (event, response) {
+    response = JSON.parse(response);
+    console.log("Reee ", response)
+    if (response.type == "init") {
+        for (var k in response.data) {
+            if (k in data) {
+                data[k] = response.data[k];
+            }
         }
     }
-}
-function handleKeyUp(event) {
-    var vKey = event.keyCode ? event.keyCode : event.which ? event.which : event.charCode;
-    // If Escape key is pressed
-    if (vKey == 27) {
-        _clear();
+    else if (response.type == "update") {
+        for (var k in response.data) {
+            if (k in data) {
+                if (k != "windowId")
+                    data[k] = response.data[k];
+            }
+        }
     }
+    console.log("After update :: ", data);
+    updateControls();
+});
+
+function sendDataToMain(value, type = "data-update") {
+    ipcRenderer.send("request", { type: type, data: value });
 }
+
+document.addEventListener("navigate", (e) => {
+    console.log("Navigation :: ", e);
+    alert("About to navigate")
+})
+
+sendDataToMain({}, "init");
 
 function addControls() {
     var styleTag = document.createElement("style")
@@ -126,7 +75,46 @@ function addControls() {
     controls.id = "__flowchartCreator_app_controls__";
     controls.innerHTML = control_html;
     document.body.appendChild(controls);
+    addedControls = true;
 }
+
+function updateControls() {
+    if (!document.getElementById("__flowchartCreator_app_controls__")) {
+        addControls();
+    }
+    var start_btn = document.getElementById("start");
+    var stop_btn = document.getElementById("stop");
+    var pause_btn = document.getElementById("pause");
+
+    if (data.state == "start") {
+        start_btn.style.color = "#b7ffc7";
+        start_btn.style.pointerEvents = "none";
+        pause_btn.style.color = "#007bff";
+        pause_btn.style.pointerEvents = "auto";
+        stop_btn.style.color = "#dc3545";
+        stop_btn.style.pointerEvents = "auto";
+    } else if (data.state == "pause") {
+        pause_btn.style.color = "#bddbfa";
+        pause_btn.style.pointerEvents = "none";
+        start_btn.setAttribute("title", "Resume Recording");
+        start_btn.classList = "fa fa-play start-pause action-btn";
+        start_btn.style.color = "#007bff";
+        start_btn.style.pointerEvents = "auto";
+        stop_btn.style.color = "#dc3545";
+        stop_btn.style.pointerEvents = "auto";
+    }
+    else {
+        start_btn.style.color = "#28a745";
+        start_btn.style.pointerEvents = "auto";
+        start_btn.setAttribute("title", "Start Recording");
+        start_btn.classList = "fa fa-play action-btn";
+        pause_btn.style.color = "#bddbfa";
+        pause_btn.style.pointerEvents = "none";
+        stop_btn.style.color = "#f8bec5";
+        stop_btn.style.pointerEvents = "none";
+    }
+}
+
 function start_recording() {
     var start_btn = document.getElementById("start");
     var stop_btn = document.getElementById("stop");
@@ -168,15 +156,16 @@ function pause_recording() {
     pause_btn.style.pointerEvents = "none";
     start_btn.setAttribute("title", "Resume Recording");
     start_btn.classList = "fa fa-play start-pause action-btn";
-    start_btn.style.color = "#28a745";
+    start_btn.style.color = "#007bff";
     start_btn.style.pointerEvents = "auto";
-    stop_btn.style.color = "#f8bec5";
-    stop_btn.style.pointerEvents = "none";
+    stop_btn.style.color = "#dc3545";
+    stop_btn.style.pointerEvents = "auto";
     data.state = "pause";
     removeEventListeners();
 }
 function toggleControls() {
     var controls = document.getElementById("__flowchartCreator_app_controls__");
+    console.log("Clciked")
     var classes = controls.classList;
     if (classes != "open")
         controls.classList = "open";
@@ -184,21 +173,224 @@ function toggleControls() {
         controls.classList = "";
 }
 
+var clickableElementRoles = ["button", "link", "combobox", "checkbox", "searchbox", "textbox", "radio", "menuitem", "menuitemcheckbox", "menuitemradio", "switch", "dialog", "tab", "menu", "menubar", "toolbar", "navigation"];
+var changeableRoles = ["listbox", "combobox", "textbox", "searchbox"];
+var typableElementsRoles = ["textbox", "searchbox"];
+var clickableElements = ["iframe"];
+var changeableInputTypes = ["birthday", "time"];
+
+function deepEqual(x, y) {
+    const ok = Object.keys, tx = typeof x, ty = typeof y;
+    return x && y && tx === 'object' && tx === ty ? (
+        ok(x).every(key => deepEqual(x[key], y[key]))
+    ) : (x === y);
+}
+
+function addToFlowChart(action, selector, element = undefined, onChanged = false) {
+    if (!selector)
+        return;
+    if (!data.code || data.code.length == 0) {
+        data.code = [{ action: { action: "visit", value: `${window.location.href}` }, details: {} }];
+    }
+    var role = element ? dom_accessibility_api.getRole(element) : null;
+    var code_lines = data.code;
+    var [last_line] = code_lines.slice(-1);
+    var action_to_add = { action: action, details: selector.details };
+    var isSameasLastLine = last_line ? (deepEqual(last_line, action_to_add)) : false;
+    var code_updated = false;
+    if (isKeyPressed == 1 && onChanged && (key_pressed_selector_element && deepEqual(key_pressed_selector_element.selector.details, selector.details) && key_pressed_selector_element.element == element)) {
+        // code_lines.splice(-1, 0, code);
+        code_updated = true;
+    }
+    else if (!isSameasLastLine) {
+        code_lines.push(action_to_add);
+        code_updated = true;
+    }
+    else if (role == "checkbox") {
+        code_lines.push(action_to_add);
+        code_updated = true;
+    }
+
+    if (isKeyPressed >= 0)
+        isKeyPressed += 1;
+    if (isKeyPressed > 1) {
+        isKeyPressed = -1;
+        key_pressed_selector_element = {};
+    }
+    if (code_updated) {
+        data.code = code_lines;
+        sendDataToMain(data);
+    }
+    console.log("Code :: ", data.code)
+}
+
+function handleClick(event) {
+    if (data.state == "start") {
+        function verifyClickedAndAddCode(selector) {
+            var element = selector.element;
+            var tagName = element.tagName.toLowerCase();
+            var role = dom_accessibility_api.getRole(element);
+            if (element.parentNode.id == "__flowchartCreator_app_controls_box__" || element.parentNode.id == "__flowchartCreator_app_controls__") {
+                return true;
+            }
+            if (tagName == "html" || tagName == "body" || tagName == "label" || role == "slider") {
+                return true;
+            }
+            if (selector && selector.selector && (settings.useAllElements || clickableElements.indexOf(tagName) != -1 || clickableElementRoles.indexOf(role) != -1 || element.getAttribute("onclick") || element.getAttribute("aria-pressed") || (element.getAttribute("aria-haspopup") && element.getAttribute("aria-haspopup") != "false"))) {
+                var l = element.getAttribute("list");
+                var isAttrListPresent = false;
+                if (l && l.trim()) {
+                    if (document.getElementById(l.trim()))
+                        isAttrListPresent = true;
+                }
+                if (role != "combobox" || (role == "combobox" && (tagName == "button" || (tagName != "select" && !isAttrListPresent)))) {
+                    var action = { action: "click" }
+                    addToFlowChart(action, selector.selector, selector.selector.element);
+                    return true;
+                }
+            }
+            return false;
+        }
+        var selector = { element: event.target, selector: getElementSelector.getElementCySelector(event.target) };
+        if (current_selector.element == selector.element) {
+            selector = current_selector;
+        }
+        else {
+            current_selector = { element: null, selector: null }
+        }
+
+
+        if (!verifyClickedAndAddCode(selector)) {
+            var parent = selector.element.parentNode;
+            var role = dom_accessibility_api.getRole(parent);
+            if (parent.nodeType != Node.DOCUMENT_NODE && (role || settings.useAllElements)) {
+                selector = { element: parent, selector: getElementSelector.getElementCySelector(parent) };
+                verifyClickedAndAddCode(selector);
+            }
+        }
+    }
+}
+
+
+function handleOnChangeEvent(event) {
+    if (data.state == "start") {
+
+        var element = null, selector = null;
+        if (current_selector.selector) {
+            element = current_selector.element;
+            selector = current_selector.selector;
+        } else {
+            element = event.target;
+            selector = getElementSelector.getElementCySelector(element);
+        }
+        if (!selector)
+            return;
+        var role = dom_accessibility_api.getRole(element);
+        var ignoreRolesForOnChange = clickableElementRoles.filter((v) => { return changeableRoles.indexOf(v) == -1 })
+        var tagName = element.tagName.toLowerCase();
+        var l = element.getAttribute("list");
+        var isAttrListPresent = false;
+        if (l && l.trim()) {
+            if (document.getElementById(l.trim()))
+                isAttrListPresent = true;
+        }
+        var isTypable = typableElementsRoles.indexOf(role) != -1 || (role == "combobox" && isAttrListPresent) || (tagName == "input" && element.type == "password");
+        if (settings.useAllElements || changeableRoles.indexOf(role) != -1 || changeableInputTypes.indexOf((element.type || "").trim())) {
+            if (ignoreRolesForOnChange.indexOf(role) == -1) {
+                var value = element.value;
+                if (value || (value == "" && isTypable)) {
+                    var action = {}
+                    if (role == "listbox" || (role == "combobox" && !(tagName == "button" || isAttrListPresent || isTypable))) {
+                        action.action = "select";
+                        action.value = value;
+                    }
+                    else if (isTypable) {
+                        action.action = "type";
+                        action.value = value;
+                    }
+                    else {
+                        action.action = "invoke";
+                        action.attr = "attr";
+                        action.value = value;
+                    }
+                    addToFlowChart(action, selector, selector.element, true);
+                }
+            }
+        }
+    }
+}
+
+function handleFocus(event) {
+    if (data.state == "start") {
+        var element = event.target;
+        current_selector.element = element;
+        current_selector.selector = getElementSelector.getElementCySelector(element);
+    }
+}
+
+function handleKeyUp(event) {
+    var vKey = event.keyCode ? event.keyCode : event.which ? event.which : event.charCode;
+    var index = keysPressed.indexOf(vKey);
+    if (index > -1) {
+        keysPressed.splice(index, 1);
+    }
+}
+
+//When some key is released
+function handleKeyDown(event) {
+    //Identifies the key
+    var vKey = event.keyCode ? event.keyCode : event.which ? event.which : event.charCode;
+    if (keysPressed.indexOf(vKey) <= -1) {
+        keysPressed.push(vKey);
+    }
+    if ((keysPressed.length == 1 && (vKey == ENTER_CODE || vKey == TAB_CODE)) && data.state == "start") {
+        var selector = null;
+        var element = document.activeElement;
+        selector = getElementSelector.getElementCySelector(element);
+        if (selector) {
+            var code = "";
+            key_pressed_selector_element = { selector: selector, element: selector.element };
+            isKeyPressed = -1;
+            handleOnChangeEvent(event);
+            isKeyPressed = 0;
+            var action = { action: "keyPress", value: vKey }
+            if (vKey == 13) {
+                var role = dom_accessibility_api.getRole(element);
+                if (role == "textbox" || role == "searchbox") {
+                    addToFlowChart(action, selector)
+                }
+            }
+            else if (vKey == 9) {
+                addToFlowChart(action, selector);
+            }
+        }
+    }
+
+}
+
 function addEventListeners() {
-    document.addEventListener("mouseover", handleMouseOver, true);
     document.addEventListener("click", handleClick, true);
+    document.addEventListener("change", handleOnChangeEvent, true);
     document.addEventListener("keyup", handleKeyUp);
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("focus", handleFocus, true);
+    sendDataToMain(data);
 }
 
 function removeEventListeners() {
-    _clear();
-    document.removeEventListener("mouseover", handleMouseOver, true);
     document.removeEventListener("click", handleClick, true);
+    document.removeEventListener("change", handleOnChangeEvent, true);
     document.removeEventListener("keyup", handleKeyUp);
+    document.removeEventListener("keydown", handleKeyDown);
+    document.removeEventListener("focus", handleFocus, true);
+    sendDataToMain(data);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    addControls();
+    if (!document.getElementById("__flowchartCreator_app_controls__")) {
+        addControls();
+    }
+    updateControls();
     document.getElementById("__flowchartCreator_app_controls_toggle_btn__").addEventListener("click", toggleControls);
     document.getElementById("start").addEventListener("click", start_recording);
     document.getElementById("stop").addEventListener("click", stop_recording);
