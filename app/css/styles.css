@@ -24,7 +24,7 @@ body {
     color: #6426a7;
 }
 
-#search {
+#__f231465sadwsRwqad_electron_app_search_input_field__ {
     align-items: center;
     background: #8a44d5;
     border-radius: 10px;
@@ -36,13 +36,13 @@ body {
     width: 500px;
 }
 
-#search:hover,
-#search:focus {
+#__f231465sadwsRwqad_electron_app_search_input_field__:hover,
+#__f231465sadwsRwqad_electron_app_search_input_field__:focus {
     background: #853cd3;
 }
 
-#search button,
-#search input {
+#__f231465sadwsRwqad_electron_app_search_input_field__ button,
+#__f231465sadwsRwqad_electron_app_search_input_field__ input {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
@@ -53,39 +53,39 @@ body {
     outline: 0;
 }
 
-#search button {
+#__f231465sadwsRwqad_electron_app_search_input_field__ button {
     cursor: pointer;
     padding: 0 0.25em;
 }
 
-#search input {
+#__f231465sadwsRwqad_electron_app_search_input_field__ input {
     flex: 1;
 }
 
-#search input::-moz-placeholder {
+#__f231465sadwsRwqad_electron_app_search_input_field__ input::-moz-placeholder {
     color: #fff;
 }
 
-#search input:-ms-input-placeholder {
+#__f231465sadwsRwqad_electron_app_search_input_field__ input:-ms-input-placeholder {
     color: #fff;
 }
 
-#search input::placeholder {
+#__f231465sadwsRwqad_electron_app_search_input_field__ input::placeholder {
     color: #fff;
 }
 
-#search .spinner {
+#__f231465sadwsRwqad_electron_app_search_input_field__ .spinner {
     -webkit-animation: spinner 1s infinite linear;
     animation: spinner 1s infinite linear;
     display: none;
     padding: 0 0.25em;
 }
 
-#search.loading button {
+#__f231465sadwsRwqad_electron_app_search_input_field__.loading button {
     display: none;
 }
 
-#search.loading .spinner {
+#__f231465sadwsRwqad_electron_app_search_input_field__.loading .spinner {
     display: block;
 }
 

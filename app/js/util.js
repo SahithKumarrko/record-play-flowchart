@@ -1,9 +1,13 @@
 var { ipcRenderer } = require('electron');
-
+const path = require("path");
+const url = require("url");
 const getElementSelector = require("./element_selector.js");
 
 const dom_accessibility_api = require("dom-accessibility-api");
 const ariaQuery = require("aria-query");
+
+var appBaseURL = url.parse(path.join(__dirname, "../", "index.html")).href
+
 // The current CY selector generated from the user action.
 var current_selector = { element: null, selector: null };
 // To handle tab presses. (If isTabPressed==1 and onchange event is fired then the code needs to be corrected by moving the code for onchange event on top of tab press code. As this is how events occur keydown->OnChange->Focus)
@@ -46,16 +50,17 @@ ipcRenderer.on('response', function (event, response) {
     }
     console.log("After update :: ", data);
     updateControls();
+    if (data.state == "start") {
+        addEventListeners();
+    } else {
+        removeEventListeners();
+    }
 });
 
 function sendDataToMain(value, type = "data-update") {
     ipcRenderer.send("request", { type: type, data: value });
 }
 
-document.addEventListener("navigate", (e) => {
-    console.log("Navigation :: ", e);
-    alert("About to navigate")
-})
 
 sendDataToMain({}, "init");
 
@@ -129,6 +134,7 @@ function start_recording() {
     data.url = "";
     data.state = "start";
     addEventListeners();
+    sendDataToMain(data);
 }
 
 function stop_recording() {
@@ -146,6 +152,7 @@ function stop_recording() {
     data.url = "";
     data.state = "stop";
     removeEventListeners();
+    sendDataToMain(data);
 }
 
 function pause_recording() {
@@ -162,6 +169,7 @@ function pause_recording() {
     stop_btn.style.pointerEvents = "auto";
     data.state = "pause";
     removeEventListeners();
+    sendDataToMain(data);
 }
 function toggleControls() {
     var controls = document.getElementById("__flowchartCreator_app_controls__");
@@ -173,11 +181,11 @@ function toggleControls() {
         controls.classList = "";
 }
 
-var clickableElementRoles = ["button", "link", "combobox", "checkbox", "searchbox", "textbox", "radio", "menuitem", "menuitemcheckbox", "menuitemradio", "switch", "dialog", "tab", "menu", "menubar", "toolbar", "navigation"];
-var changeableRoles = ["listbox", "combobox", "textbox", "searchbox"];
-var typableElementsRoles = ["textbox", "searchbox"];
+var clickableElementRoles = ["button", "link", "combobox", "checkbox", "searchbox", "textbox", "radio", "menuitem", "menuitemcheckbox", "menuitemradio", "switch", "dialog", "tab", "menu", "menubar", "toolbar", "navigation", "spinbutton"];
+var changeableRoles = ["listbox", "combobox", "textbox", "searchbox", "spinbutton", "slider"];
+var typableElementsRoles = ["textbox", "searchbox", "combobox"];
 var clickableElements = ["iframe"];
-var changeableInputTypes = ["birthday", "time"];
+var changeableInputTypes = ["birthday", "time", "week", "month", "datetime-local", "file"];
 
 function deepEqual(x, y) {
     const ok = Object.keys, tx = typeof x, ty = typeof y;
@@ -189,9 +197,9 @@ function deepEqual(x, y) {
 function addToFlowChart(action, selector, element = undefined, onChanged = false) {
     if (!selector)
         return;
-    if (!data.code || data.code.length == 0) {
-        data.code = [{ action: { action: "visit", value: `${window.location.href}` }, details: {} }];
-    }
+    // if (!data.code || data.code.length == 0) {
+    //     data.code = [{ action: { action: "visit", value: `${window.location.href}` }, details: {} }];
+    // }
     var role = element ? dom_accessibility_api.getRole(element) : null;
     var code_lines = data.code;
     var [last_line] = code_lines.slice(-1);
@@ -223,14 +231,19 @@ function addToFlowChart(action, selector, element = undefined, onChanged = false
     }
     console.log("Code :: ", data.code)
 }
-
 function handleClick(event) {
     if (data.state == "start") {
         function verifyClickedAndAddCode(selector) {
+
             var element = selector.element;
             var tagName = element.tagName.toLowerCase();
             var role = dom_accessibility_api.getRole(element);
-            if (element.parentNode.id == "__flowchartCreator_app_controls_box__" || element.parentNode.id == "__flowchartCreator_app_controls__") {
+            //Controls
+            if (element.id == "__flowchartCreator_app_controls_box__" || element.parentNode.id == "__flowchartCreator_app_controls_box__" || element.parentNode.id == "__flowchartCreator_app_controls__") {
+                return true;
+            }
+            //SearchField
+            if (element.id == "__f231465sadwsRwqad_electron_app_search_input_field__" || element.parentNode.id == "__f231465sadwsRwqad_electron_app_search_input_field__") {
                 return true;
             }
             if (tagName == "html" || tagName == "body" || tagName == "label" || role == "slider") {
@@ -246,8 +259,8 @@ function handleClick(event) {
                 if (role != "combobox" || (role == "combobox" && (tagName == "button" || (tagName != "select" && !isAttrListPresent)))) {
                     var action = { action: "click" }
                     addToFlowChart(action, selector.selector, selector.selector.element);
-                    return true;
                 }
+                return true;
             }
             return false;
         }
@@ -274,7 +287,6 @@ function handleClick(event) {
 
 function handleOnChangeEvent(event) {
     if (data.state == "start") {
-
         var element = null, selector = null;
         if (current_selector.selector) {
             element = current_selector.element;
@@ -285,28 +297,38 @@ function handleOnChangeEvent(event) {
         }
         if (!selector)
             return;
+
+        if (element.id == "__f231465sadwsRwqad_electron_app_search_input_field__" || element.parentNode.id == "__f231465sadwsRwqad_electron_app_search_input_field__") {
+            return;
+        }
         var role = dom_accessibility_api.getRole(element);
         var ignoreRolesForOnChange = clickableElementRoles.filter((v) => { return changeableRoles.indexOf(v) == -1 })
         var tagName = element.tagName.toLowerCase();
         var l = element.getAttribute("list");
-        var isAttrListPresent = false;
-        if (l && l.trim()) {
-            if (document.getElementById(l.trim()))
-                isAttrListPresent = true;
-        }
-        var isTypable = typableElementsRoles.indexOf(role) != -1 || (role == "combobox" && isAttrListPresent) || (tagName == "input" && element.type == "password");
+
+        var isTypable = typableElementsRoles.indexOf(role) != -1 || (tagName == "input" && element.type == "password");
         if (settings.useAllElements || changeableRoles.indexOf(role) != -1 || changeableInputTypes.indexOf((element.type || "").trim())) {
             if (ignoreRolesForOnChange.indexOf(role) == -1) {
                 var value = element.value;
                 if (value || (value == "" && isTypable)) {
                     var action = {}
-                    if (role == "listbox" || (role == "combobox" && !(tagName == "button" || isAttrListPresent || isTypable))) {
+                    if (role == "listbox") {
                         action.action = "select";
                         action.value = value;
                     }
                     else if (isTypable) {
                         action.action = "type";
                         action.value = value;
+                    }
+                    else if (element.type == "file") {
+                        action.action = "upload";
+                        var listOfFiles = [];
+                        for (var i = 0; i < element.files.length; i++) {
+                            // listOfFiles.push(`"${URL.createObjectURL(element.files[i])}"`);
+                            listOfFiles.push(`"${element.files[i].name}"`)
+                        }
+                        action.value = listOfFiles;
+
                     }
                     else {
                         action.action = "invoke";
@@ -343,7 +365,7 @@ function handleKeyDown(event) {
     if (keysPressed.indexOf(vKey) <= -1) {
         keysPressed.push(vKey);
     }
-    if ((keysPressed.length == 1 && (vKey == ENTER_CODE || vKey == TAB_CODE)) && data.state == "start") {
+    if (window.location.href.toLocaleLowerCase().indexOf(appBaseURL) == -1 && (keysPressed.length == 1 && (vKey == ENTER_CODE || vKey == TAB_CODE)) && data.state == "start") {
         var selector = null;
         var element = document.activeElement;
         selector = getElementSelector.getElementCySelector(element);
@@ -374,7 +396,6 @@ function addEventListeners() {
     document.addEventListener("keyup", handleKeyUp);
     document.addEventListener("keydown", handleKeyDown);
     document.addEventListener("focus", handleFocus, true);
-    sendDataToMain(data);
 }
 
 function removeEventListeners() {
@@ -383,7 +404,6 @@ function removeEventListeners() {
     document.removeEventListener("keyup", handleKeyUp);
     document.removeEventListener("keydown", handleKeyDown);
     document.removeEventListener("focus", handleFocus, true);
-    sendDataToMain(data);
 }
 
 document.addEventListener('DOMContentLoaded', function () {

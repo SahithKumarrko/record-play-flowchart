@@ -11,7 +11,7 @@
 </head>
 
 <body>
-    <div id="search">
+    <div id="__f231465sadwsRwqad_electron_app_search_input_field__">
         <input id="input" placeholder="Search..." />
         <button id="button"><i class="fa fa-search"></i></button>
         <div class="spinner"><i class="fa fa-spinner"></i></div>
@@ -20,11 +20,10 @@
     <a href="http://www.google.com" target="_blank">Open new page</a>
     <a href="http://www.google.com" target="_self">Open self page</a>
     <script>
-        var search = document.getElementById('search');
+        var search = document.getElementById('__f231465sadwsRwqad_electron_app_search_input_field__');
         var button = document.getElementById('button');
         var input = document.getElementById('input');
         function open_page() {
-            alert("D osdasd");
             if (input.value.trim())
                 window.location.href = input.value;
         }

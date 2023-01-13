@@ -1,23 +1,125 @@
-const debug = false;
+const debug = true;
 
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
-const electronReload = require('electron-reload')
+const { app, BrowserWindow, shell, ipcMain, Menu } = require('electron');
 const path = require("path")
 const url = require("url");
 const fs = require("fs");
 const fsPromises = require("fs").promises;
-var current_window = -1;
 const contextMenu = require("electron-context-menu");
+
 require('electron-reload')(__dirname, {
     electron: path.join(__dirname, 'node_modules', '.bin', 'electron'),
     ignored: [/data\/data.json/]
 });
+
+
 let win;
 var windows = [];
 var data = { url: "", state: "stop", code: [] };
 var webNavigations = {};
 var initialLoad = true;
+var current_state = data.state; 1
+var menu;
+
 // process.env['ELECTRON_DISABLE_SECURITY_WARNINGS']=true
+const isMac = process.platform === 'darwin'
+
+
+function setMenu() {
+    var template = [
+        {
+            label: "Run",
+            submenu: [
+                {
+                    label: "Start",
+                    id: "run-start",
+                    click: () => {
+                        data.state = "start";
+                        sendMessagetoAllTabs(data, "update");
+                    }
+                },
+                {
+                    label: "Pause",
+                    id: "run-pause",
+                    enabled: false,
+                    click: () => {
+                        data.state = "pause";
+                        sendMessagetoAllTabs(data, "update");
+                    }
+                },
+                {
+                    label: "Stop",
+                    id: "run-stop",
+                    enabled: false,
+                    click: () => {
+                        data.state = "stop";
+                        sendMessagetoAllTabs(data, "update");
+                    }
+                }
+            ]
+        },
+        {
+            label: 'Edit',
+            submenu: [
+                { role: 'undo' },
+                { role: 'redo' },
+                { type: 'separator' },
+                { role: 'cut' },
+                { role: 'copy' },
+                { role: 'paste' },
+                ...(isMac ? [
+                    { role: 'pasteAndMatchStyle' },
+                    { role: 'delete' },
+                    { role: 'selectAll' },
+                    { type: 'separator' },
+                    {
+                        label: 'Speech',
+                        submenu: [
+                            { role: 'startSpeaking' },
+                            { role: 'stopSpeaking' }
+                        ]
+                    }
+                ] : [
+                    { role: 'delete' },
+                    { type: 'separator' },
+                    { role: 'selectAll' }
+                ])
+            ]
+        },
+        {
+            label: 'View',
+            submenu: [
+                { role: 'reload' },
+                { role: 'forceReload' },
+                { role: 'toggleDevTools' },
+                { type: 'separator' },
+                { role: 'resetZoom' },
+                { role: 'zoomIn' },
+                { role: 'zoomOut' },
+                { type: 'separator' },
+                { role: 'togglefullscreen' }
+            ]
+        },
+        {
+            label: 'Window',
+            submenu: [
+                { role: 'minimize' },
+                { role: 'zoom' },
+                ...(isMac ? [
+                    { type: 'separator' },
+                    { role: 'front' },
+                    { type: 'separator' },
+                    { role: 'window' }
+                ] : [
+                    { role: 'close' }
+                ])
+            ]
+        },
+    ];
+    menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
+}
+
 function createWindow() {
     win = new BrowserWindow({
         enableRemoteModule: true,
@@ -35,7 +137,7 @@ function createWindow() {
     win.loadURL(url.parse(path.join(__dirname, "app", "index.html")).href);
     win.on("closed", () => {
         win = null;
-    })
+    });
     // win.on("close", handleBrowserWindowClosed)
     // win.webContents.on("did-finish-load", () => {
     //     console.log("Navigated :: ");
@@ -70,9 +172,7 @@ function handleFinishLoad(windowId) {
         try {
             url = BrowserWindow.fromId(windowId).webContents.getURL();
         } catch (err) { }
-        console.log("URL :: ", url);
-        data.code.push({ action: {}, details: { type: "navigation", value: url || "", options: { isInPlace: webNavigations[windowId] || false } } });
-        // sendMessagetoTab(data, "update");
+        data.code.push({ action: { type: "navigation", value: url || "" }, details: { options: { isInPlace: webNavigations[windowId] || true } } });
         delete webNavigations[windowId];
         sendMessagetoAllTabs(data, "update");
 
@@ -169,7 +269,10 @@ contextMenu({
     showInspectElement: debug,
     showServices: true,
 })
-app.on("ready", createWindow);
+app.on("ready", function () {
+    createWindow();
+    setMenu();
+});
 app.on("window-all-closed", () => {
     if (process.platform != "darwin")
         app.quit();
@@ -208,6 +311,9 @@ const checkIfVisible = windowId => new Promise(async (res) => {
     }
     res("done");
 });
+
+
+
 ipcMain.on('request', async function (event, request) {
     if (request.type == "init") {
         await checkIfVisible(event.sender.id);
@@ -217,6 +323,23 @@ ipcMain.on('request', async function (event, request) {
         for (var k in request.data) {
             if (k in data) {
                 data[k] = request.data[k];
+            }
+        }
+        if (current_state != data.state) {
+            current_state = data.state;
+            if (data.state == "start") {
+                menu.getMenuItemById('run-start').enabled = false;
+                menu.getMenuItemById('run-stop').enabled = true;
+                menu.getMenuItemById('run-pause').enabled = true;
+            } else if (data.state == "pause") {
+                menu.getMenuItemById('run-start').enabled = true;
+                menu.getMenuItemById('run-stop').enabled = true;
+                menu.getMenuItemById('run-pause').enabled = false;
+            }
+            else {
+                menu.getMenuItemById('run-start').enabled = true;
+                menu.getMenuItemById('run-stop').enabled = false;
+                menu.getMenuItemById('run-pause').enabled = false;
             }
         }
         if (!fs.existsSync(path.join(__dirname, "data"))) {
